@@ -1,0 +1,23 @@
+/plan
+
+# OS
+.DS_Store
+
+# Java
+**/target/
+**/.gradle/
+
+# Go
+**/bin/
+**/*.exe
+
+# Python / AI
+**/__pycache__/
+**/.venv/
+
+# Env
+.env
+.env.*
+
+# Logs
+*.log
