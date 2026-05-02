@@ -1,6 +1,7 @@
 package lib
 
 type Pool struct {
+	workerCount int
 }
 
 type Worker struct {
