@@ -12,12 +12,18 @@ import jakarta.websocket.server.PathParam;
 
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+
+import java.net.URI;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 @RestController
+@Validated
 @RequestMapping("/api/accounts")
 public class AccountsController {
 
@@ -29,8 +35,14 @@ public class AccountsController {
 
     @PostMapping("/")
     public ResponseEntity<Void> createAccount(@RequestBody AccountsDto.CreateAccountRequest entity) {
-        Account a = accountService.createAccount(entity);
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+        Long accountId = accountService.createAccount(entity);
+        URI location = URI.create("/api/accounts/" + accountId);
+        return ResponseEntity.created(location).build();
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Account> getAccountDetails(@PathVariable("id") String accountId) {
+        return new ResponseEntity<Account>();
     }
 
     @GetMapping("/{accNum}/balance")

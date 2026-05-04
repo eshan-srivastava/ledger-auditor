@@ -24,7 +24,7 @@ public class AccountService {
         this.accountMapper = accMapper;
     };
 
-    public Account createAccount(AccountsDto.CreateAccountRequest request) {
+    public Long createAccount(AccountsDto.CreateAccountRequest request) {
         User user = userRepo.findById(request.userId())
             .orElseThrow(() -> new UserException.NotFound(request.userId()));
 
@@ -36,7 +36,8 @@ public class AccountService {
         account.setAccountNumber(request.accountNumer());
         account.setType(request.accountType());
         account.setUser(user);
-        return accountRepo.save(account);
+        Account savedAcc = accountRepo.save(account);
+        return savedAcc.getId();
     }
 
     public AccountsDto.AccountBalanceResponse calculateAccountBalance(String accountNumber) {

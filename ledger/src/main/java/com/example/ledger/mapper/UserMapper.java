@@ -18,11 +18,10 @@ public class UserMapper {
         User user = new User();
         user.setName(request.name());
         user.setEmail(request.email());
-        // user.setPassword(request.password());
         return user;
     }
 
-    public UserDto.UserDetailsResponse toResponse(User user) {
+    public UserDto.UserDetailsResponse toDetailsResponse(User user) {
         if (user == null) {
             return null;
         }
@@ -34,7 +33,7 @@ public class UserMapper {
             user.getCreatedAt());
     }
 
-    public UserDto.BalanceResponse toBalanceResponse(User user) {
+    public UserDto.BalanceResponse toBalanceResponse(User user, BigDecimal balance) {
         if (user == null)
             return null;
 

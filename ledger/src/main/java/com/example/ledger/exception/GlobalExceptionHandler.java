@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.lang.NonNull;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -62,7 +63,7 @@ public class GlobalExceptionHandler {
             .body(ApiError.of(ErrorCode.INTERNAL_ERROR, "Unexpected ErrorCode", request.getRequestURI()));
     };
 
-    private HttpStatus mapStatus(ErrorCode code) {
+    private @NonNull HttpStatus mapStatus(ErrorCode code) {
         return switch (code) {
             case USER_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case USER_ALREADY_EXISTS -> HttpStatus.CONFLICT;

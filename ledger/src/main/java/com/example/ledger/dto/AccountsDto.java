@@ -24,4 +24,12 @@ public class AccountsDto {
         String accountNumber,
         BigDecimal balance) {
     }
+
+    public record AccountDetailsResponse(
+        Long accountId,
+        String accountNumber,
+        AccountType accountType,
+        String username,
+        BigDecimal balance) {
+    }
 }
