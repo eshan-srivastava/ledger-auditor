@@ -1,7 +1,7 @@
 package com.example.ledger.dto;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -31,7 +31,7 @@ public class UserDto {
                 Long id,
                 String name,
                 String email,
-                LocalDateTime createdAt) {
+                Instant createdAt) {
 
         }
 }

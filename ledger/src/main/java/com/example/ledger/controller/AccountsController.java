@@ -4,8 +4,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.ledger.dto.AccountsDto;
-import com.example.ledger.mapper.AccountMapper;
-import com.example.ledger.model.Account;
 import com.example.ledger.service.AccountService;
 
 import jakarta.websocket.server.PathParam;
@@ -15,7 +13,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 import java.net.URI;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,16 +37,17 @@ public class AccountsController {
         return ResponseEntity.created(location).build();
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<Account> getAccountDetails(@PathVariable("id") String accountId) {
-        return new ResponseEntity<Account>();
+    @GetMapping("/{accNum}")
+    public ResponseEntity<AccountsDto.AccountDetailsResponse> getAccountDetails(
+        @PathVariable("accNum") String accountNumber) {
+        AccountsDto.AccountDetailsResponse response = accountService.getAccountDetails(accountNumber);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{accNum}/balance")
-
     public ResponseEntity<AccountsDto.AccountBalanceResponse> getAccountBalance(
         @PathParam("accNum") String accountNumber, @RequestParam String param) {
-        AccountsDto.AccountBalanceResponse balanceResponse = accountService.calculateAccountBalance(accountNumber);
+        AccountsDto.AccountBalanceResponse balanceResponse = accountService.getAccountBalance(accountNumber);
 
         return ResponseEntity.ok(balanceResponse);
     }

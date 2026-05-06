@@ -1,6 +1,7 @@
 package com.example.ledger.dto;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 
 import com.example.ledger.enums.AccountType;
 
@@ -29,6 +30,7 @@ public class AccountsDto {
         Long accountId,
         String accountNumber,
         AccountType accountType,
+        Instant createdAt,
         String username,
         BigDecimal balance) {
     }

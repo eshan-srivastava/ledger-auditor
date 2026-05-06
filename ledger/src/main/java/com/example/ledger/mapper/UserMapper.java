@@ -4,6 +4,7 @@ import com.example.ledger.model.User;
 import com.example.ledger.dto.UserDto;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 
 import org.springframework.stereotype.Component;
 
@@ -18,6 +19,7 @@ public class UserMapper {
         User user = new User();
         user.setName(request.name());
         user.setEmail(request.email());
+        user.setCreatedAt(Instant.now());
         return user;
     }
 

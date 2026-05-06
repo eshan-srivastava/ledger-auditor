@@ -1,8 +1,9 @@
 package com.example.ledger.model;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GenerationType;
@@ -20,8 +21,11 @@ public class Transaction {
     @GeneratedValue(strategy = GenerationType.SEQUENCE)
     private Long id;
 
+    @Column(nullable = false, updatable = false)
     private BigDecimal amount;
-    private LocalDateTime createdAt;
+
+    @Column(nullable = false, updatable = false)
+    private Instant createdAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "source_account_id")
@@ -46,7 +50,7 @@ public class Transaction {
         this.sourceAccount = sourceAccount;
         this.destinationAccount = destinationAccount;
         this.originId = originId;
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = Instant.now();
     }
 
     @Override
@@ -99,11 +103,11 @@ public class Transaction {
         this.originId = originId;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 

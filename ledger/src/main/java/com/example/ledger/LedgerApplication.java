@@ -1,5 +1,7 @@
 package com.example.ledger;
 
+import java.util.TimeZone;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -15,6 +17,8 @@ public class LedgerApplication {
 	private static final Logger logger = LoggerFactory.getLogger(LedgerApplication.class);
 
 	public static void main(String[] args) {
+
+		TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
 		SpringApplication.run(LedgerApplication.class, args);
 	}
 
