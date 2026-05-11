@@ -16,9 +16,9 @@ public class UserMapper {
             return null;
         }
 
-        User user = new User();
-        user.setName(request.name());
-        user.setEmail(request.email());
+        User user = new User(
+            request.name(),
+            request.email());
         user.setCreatedAt(Instant.now());
         return user;
     }

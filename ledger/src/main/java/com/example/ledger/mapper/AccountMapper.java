@@ -17,11 +17,11 @@ public class AccountMapper {
             return null;
         }
 
-        Account account = new Account();
-        account.setAccountNumber(request.accountNumer());
-        account.setType(request.accountType());
-        account.setUser(user);
-        account.setCreatedAt(Instant.now());
+        Account account = new Account(
+            request.accountNumer(),
+            request.accountType(),
+            user,
+            Instant.now());
         return account;
     }
 

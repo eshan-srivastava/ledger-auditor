@@ -2,13 +2,24 @@ package com.example.ledger.dto;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
 
 public class TransactionDto {
     // This class will expose request response for transaction business routes
 
-    public record TransactionsListResponseElem(
+    public record TransactionsListResponse(
+        List<TxnListResponseElem> transactions,
+        int total) {
+    }
 
-    ) {
+    public record TxnListResponseElem(
+        Long id,
+        BigDecimal amount,
+        Instant timestamp,
+        Long originId,
+        String sourceAccountNum,
+        String destinationAccountNum) {
     }
 
     public record TransactionDetailsResponse(
@@ -25,5 +36,13 @@ public class TransactionDto {
         String destinationAccountNum,
         Long originId,
         Integer amount) {
+    }
+
+    public record TransactionFilter(
+        String sourceAccNumber,
+        String destAccNumber,
+        Long originId,
+        LocalDate fromDate,
+        LocalDate toDate) {
     }
 }

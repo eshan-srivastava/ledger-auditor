@@ -31,6 +31,17 @@ public class User {
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     private List<Account> accounts = new ArrayList<>();
 
+    // JPA compatibility
+    protected User() {
+    }
+
+    public User(
+        String name,
+        String email) {
+        this.name = name;
+        this.email = email;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }

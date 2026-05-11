@@ -37,6 +37,22 @@ public class Account {
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
+    // JPA compatible
+    protected Account() {
+
+    }
+
+    public Account(
+        String accountNumber,
+        AccountType accType,
+        User user,
+        Instant now) {
+        this.accountNumber = accountNumber;
+        this.type = accType;
+        this.user = user;
+        this.createdAt = now;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }

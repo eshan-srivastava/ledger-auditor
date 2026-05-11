@@ -33,7 +33,7 @@ public class AccountService {
 
     public Long createAccount(AccountsDto.CreateAccountRequest request) {
         User user = userRepo.findById(request.userId())
-                .orElseThrow(() -> new UserException.NotFound(request.userId()));
+            .orElseThrow(() -> new UserException.NotFound(request.userId()));
 
         if (accountRepo.existsByAccountNumber(request.accountNumer())) {
             throw new AccountException.AlreadyExists("Account number already exists");
@@ -51,7 +51,7 @@ public class AccountService {
     public AccountsDto.AccountDetailsResponse getAccountDetails(String accountNumber) {
 
         Account account = accountRepo.findByAccountNumber(accountNumber).orElseThrow(
-                () -> new AccountException.NotFound(accountNumber));
+            () -> new AccountException.NotFound(accountNumber));
 
         BigDecimal balance = transactionRepo.calculateNetBalance(List.of(account.getId()));
 
@@ -60,7 +60,7 @@ public class AccountService {
 
     public AccountsDto.AccountBalanceResponse getAccountBalance(String accountNumber) {
         Account account = accountRepo.findByAccountNumber(accountNumber).orElseThrow(
-                () -> new AccountException.NotFound(accountNumber));
+            () -> new AccountException.NotFound(accountNumber));
 
         BigDecimal balance = transactionRepo.calculateNetBalance(List.of(account.getId()));
 
@@ -74,9 +74,13 @@ public class AccountService {
             amount = BigDecimal.valueOf(0);
         } else {
             List<Long> ids = accounts.stream()
-                    .map(Account::getId).toList();
+                .map(Account::getId).toList();
             amount = transactionRepo.calculateNetBalance(ids);
         }
         return amount;
+    }
+
+    public Account getAccountByNumber(String accNumber) {
+        return accountRepo.findByAccountNumber(accNumber).orElseThrow(() -> new AccountException.NotFound(accNumber));
     }
 }
