@@ -1,0 +1,38 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_DB: ledgerdb
+      - POSTGRES_USER: ledgeruser
+      - POSTGRES_PASSWORD: ledgerpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d appdb"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+
+  ledger:
+    build:
+      context: ./ledger
+      dockerfile: Dockerfile
+    container_name: ledgerapp
+    depends_on:
+      - postgres
+    environment:
+      - SPRING_PROFILES_ACTIVE: docker
+      - SPRING_DATASOURCE_URL=jdbc: postgresql://postgres:5432/ledgerdb
+      - SPRING_DATASOURCE_USERNAME: ledgeruser
+      - SPRING_DATASOURCE_PASSWORD: ledgerpass
+      - SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres_data:
