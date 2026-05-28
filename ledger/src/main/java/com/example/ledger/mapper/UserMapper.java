@@ -44,4 +44,13 @@ public class UserMapper {
             user.getName(),
             new BigDecimal(10));
     }
+
+    public UserDto.CreateUserResponse toCreateUserResponse(User user) {
+        if (user == null) {
+            return null;
+        }
+        return new UserDto.CreateUserResponse(
+            user.getId(),
+            user.getCreatedAt());
+    }
 }

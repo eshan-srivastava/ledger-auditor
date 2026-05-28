@@ -34,4 +34,9 @@ public class UserDto {
                 Instant createdAt) {
 
         }
+
+        public record CreateUserResponse(
+                Long userId,
+                Instant createdAt) {
+        }
 }

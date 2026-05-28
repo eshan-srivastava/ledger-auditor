@@ -18,7 +18,7 @@ public class AccountMapper {
         }
 
         Account account = new Account(
-            request.accountNumer(),
+            request.accountNumber(),
             request.accountType(),
             user,
             Instant.now());
@@ -42,5 +42,14 @@ public class AccountMapper {
     public AccountsDto.AccountBalanceResponse toBalanceResponse(Account account, BigDecimal balance) {
         return new AccountsDto.AccountBalanceResponse(
             account.getId(), account.getAccountNumber(), balance);
+    }
+
+    public AccountsDto.CreateAccountResponse toCreateAccountResponse(Account account) {
+        if (account == null) {
+            return null;
+        }
+        return new AccountsDto.CreateAccountResponse(
+            account.getId(),
+            account.getCreatedAt());
     }
 }

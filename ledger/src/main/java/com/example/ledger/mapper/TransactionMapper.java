@@ -15,14 +15,16 @@ public class TransactionMapper {
         Integer amt,
         Account sourceAccount,
         Account destAccount,
-        Long originId) {
+        Long originId,
+        String note) {
 
         BigDecimal bdamount = BigDecimal.valueOf(amt);
         Transaction txn = new Transaction(
             bdamount,
             sourceAccount,
             destAccount,
-            originId);
+            originId,
+            note);
 
         return txn;
     }
@@ -53,5 +55,14 @@ public class TransactionMapper {
             txn.getOriginId(),
             txn.getSourceAccount().getAccountNumber(),
             txn.getDestinationAccount().getAccountNumber());
+    }
+
+    public TransactionDto.CreateTransactionResponse toCreateTransactionResponse(Transaction txn) {
+        if (txn == null) {
+            return null;
+        }
+        return new TransactionDto.CreateTransactionResponse(
+            txn.getId(),
+            txn.getCreatedAt());
     }
 }

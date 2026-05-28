@@ -3,6 +3,7 @@ package com.example.ledger.model;
 import java.math.BigDecimal;
 import java.time.Instant;
 
+import jakarta.persistence.Basic;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -37,6 +38,9 @@ public class Transaction {
 
     private Long originId;
 
+    @Basic(optional = true)
+    private String noteString;
+
     // making protected constructor to make JPA compatible
     protected Transaction() {
     }
@@ -45,12 +49,14 @@ public class Transaction {
         BigDecimal amt,
         Account sourceAccount,
         Account destinationAccount,
-        Long originId) {
+        Long originId,
+        String note) {
         this.amount = amt;
         this.sourceAccount = sourceAccount;
         this.destinationAccount = destinationAccount;
         this.originId = originId;
         this.createdAt = Instant.now();
+        this.noteString = note;
     }
 
     @Override

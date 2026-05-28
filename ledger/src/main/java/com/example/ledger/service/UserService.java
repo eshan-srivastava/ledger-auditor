@@ -1,7 +1,5 @@
 package com.example.ledger.service;
 
-import java.math.BigDecimal;
-
 import org.springframework.lang.NonNull;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -17,7 +15,6 @@ import com.example.ledger.repository.UserRepo;
 public class UserService {
 
     private final UserRepo userRepository;
-    private final AccountService accountService;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
 
@@ -25,23 +22,10 @@ public class UserService {
     public UserService(
         UserRepo userRepository,
         UserMapper userMapper,
-        AccountService accSvc,
         PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.userMapper = userMapper;
-        this.accountService = accSvc;
         this.passwordEncoder = passwordEncoder;
-    }
-
-    public UserDto.BalanceResponse getUserBalance(@NonNull Long userId) {
-        // 1. Database logic goes here: fetch the user
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new UserException.NotFound(userId));
-
-        BigDecimal amount = accountService.getBalanceForUserId(userId);
-
-        // 3. Map the entity to the response DTO and return
-        return userMapper.toBalanceResponse(user, amount);
     }
 
     public UserDto.UserDetailsResponse getUserDetails(@NonNull Long userId) {
@@ -51,7 +35,7 @@ public class UserService {
         return userMapper.toDetailsResponse(user);
     }
 
-    public Long createUser(UserDto.CreateRequest request) {
+    public UserDto.CreateUserResponse createUser(UserDto.CreateRequest request) {
         if (userRepository.existsByEmail(request.email())) {
             throw new UserException.AlreadyExists(request.email());
         }
@@ -64,7 +48,15 @@ public class UserService {
         // hash password and change user object's pswd
         user.setHashedPswd(passwordEncoder.encode(request.password()));
         user = userRepository.save(user);
-        return user.getId();
+        return userMapper.toCreateUserResponse(user);
+    }
+
+    public User getUser(Long userId) {
+        if (userId == null) {
+            throw new HttpException.InternalError("userId was null");
+        }
+        return userRepository.findById(userId).orElseThrow(
+            () -> new UserException.NotFound(userId));
     }
 
     public Void updateUser(@NonNull Long userId, UserDto.UpdateRequest request) {

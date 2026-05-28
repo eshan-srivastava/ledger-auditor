@@ -6,8 +6,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.ledger.dto.TransactionDto;
 import com.example.ledger.service.TransactionService;
 
-import jakarta.websocket.server.PathParam;
-
 import java.net.URI;
 import java.time.LocalDate;
 
@@ -19,6 +17,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -55,16 +54,18 @@ public class TransactionController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<TransactionDto.TransactionDetailsResponse> getTransactionById(@PathParam("id") Long txnID) {
+    public ResponseEntity<TransactionDto.TransactionDetailsResponse> getTransactionById(
+        @PathVariable long txnID) {
         TransactionDto.TransactionDetailsResponse response = transactionService.getTransactionDetails(txnID);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/")
-    public ResponseEntity<Void> createTransaction(@RequestBody TransactionDto.CreateRequest reqbody) {
-        Long createdId = transactionService.createTransaction(reqbody);
-        URI location = URI.create("/api/transactions/" + createdId);
-        return ResponseEntity.created(location).build();
+    public ResponseEntity<TransactionDto.CreateTransactionResponse> createTransaction(
+        @RequestBody TransactionDto.CreateRequest reqbody) {
+        TransactionDto.CreateTransactionResponse response = transactionService.createTransaction(reqbody);
+        URI location = URI.create("/api/transactions/" + response.id());
+        return ResponseEntity.created(location).body(response);
     }
 
 }

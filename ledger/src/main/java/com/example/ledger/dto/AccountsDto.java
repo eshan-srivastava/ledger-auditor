@@ -11,13 +11,18 @@ import jakarta.validation.constraints.NotNull;
 public class AccountsDto {
 
     public record CreateAccountRequest(
-        @NotBlank(message = "Account number is required") String accountNumer,
+        @NotBlank(message = "Account number is required") String accountNumber,
 
         @NotNull(message = "Account type is required") AccountType accountType,
 
         @NotNull(message = "UserID is required") Long userId
 
     ) {
+    }
+
+    public record CreateAccountResponse(
+        Long accountId,
+        Instant createdAt) {
     }
 
     public record AccountBalanceResponse(

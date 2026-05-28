@@ -35,7 +35,13 @@ public class TransactionDto {
         String sourceAccountNum,
         String destinationAccountNum,
         Long originId,
-        Integer amount) {
+        Integer amount,
+        String note) {
+    }
+
+    public record CreateTransactionResponse(
+        Long id,
+        Instant createdAt) {
     }
 
     public record TransactionFilter(

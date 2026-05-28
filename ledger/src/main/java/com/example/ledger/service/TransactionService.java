@@ -1,5 +1,8 @@
 package com.example.ledger.service;
 
+import java.math.BigDecimal;
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.lang.NonNull;
@@ -45,18 +48,33 @@ public class TransactionService {
         return transactionMapper.toDetailsResponse(transaction);
     }
 
-    public Long createTransaction(TransactionDto.CreateRequest request) {
+    public TransactionDto.CreateTransactionResponse createTransaction(TransactionDto.CreateRequest request) {
         // first get both accounts and verify if they exist
         Account sourceAccount = accountService.getAccountByNumber(request.sourceAccountNum());
         Account destinationAccount = accountService.getAccountByNumber(request.destinationAccountNum());
 
         Transaction tx = transactionMapper.toEntity(request.amount(), sourceAccount, destinationAccount,
-            request.originId());
+            request.originId(), request.note());
 
         if (tx == null) {
             // handle null somehow because .save method is complaining
             throw new HttpException.InternalError("error creating transaction details");
         }
-        return transactionRepo.save(tx).getId();
+        Transaction savedTx = transactionRepo.save(tx);
+        return transactionMapper.toCreateTransactionResponse(savedTx);
+    }
+
+    public BigDecimal getBalanceForUser(Long userId) {
+        BigDecimal amount;
+        List<Long> ids = accountService.getUserAccounts(userId).stream().map(Account::getId).toList();
+        if (ids == null || ids.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        amount = transactionRepo.calculateNetBalance(ids);
+        return amount;
+    }
+
+    public BigDecimal getBalanceForAccount(Long accountId) {
+        return transactionRepo.calculateNetBalance(List.of(accountId));
     }
 }
