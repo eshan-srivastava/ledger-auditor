@@ -1,0 +1,999 @@
+base:
+  seed: 1492
+  date_range:
+    start: "2024-06-01"
+    end: "2025-05-31"
+  currency: "INR"
+  clean_db_if_nonempty: true
+  write_to_db: false
+
+# Closed enum — generator must reject any category not in this list.
+# Intentionally broad enough that AI clustering is non-trivial,
+# narrow enough that reconciliation can validate it deterministically.
+categories:
+  - Salary
+  - Rent
+  - Groceries
+  - Utilities
+  - Food Delivery
+  - Transport
+  - Subscriptions
+  - Shopping
+  - Investment
+  - Internal Transfer
+  - Healthcare
+  - Entertainment
+  - Refund
+  - Business Revenue
+  - Business Expense
+  - Tax Reserve
+  - Trading
+
+
+# ---------------------------------------------------------------------------
+# RULE TYPE REFERENCE
+# ---------------------------------------------------------------------------
+# monthly_fixed_day   — fires on exact calendar day, every month in range
+# monthly_day_range   — fires once per month, day drawn from [min, max]
+# weekly              — fires every week on the named weekday
+# random_n_per_month  — fires `mean ± variance` times per month, days random
+#                       within day_range. variance uses seeded normal dist.
+# reactive_pct        — fires automatically when trigger_account receives a
+#                       transaction of trigger_category. amount = pct of that
+#                       source transaction. models sweeps, tax pulls, etc.
+# one_time_in_range   — fires at most once in the full date range. probability
+#                       controls whether it fires at all. day_range is offset
+#                       in days from date_range.start.
+# decay_pattern       — like random_n_per_month but frequency decays after
+#                       inflection_day. models end-of-month spending dropoff.
+# refund_shadow       — does not generate transactions itself. attaches to
+#                       another rule's output (matched by source_category +
+#                       source_account) and probabilistically generates a
+#                       credit refund N days after each matched transaction.
+#
+# AMOUNT TYPE REFERENCE
+# ---------------------------------------------------------------------------
+# fixed: N            — exact value, no randomness
+# range: {min, max}   — uniform random between min and max, seeded
+# pct_of_source: N    — only valid in reactive_pct; N% of the trigger amount
+# settle_account: id  — compute outstanding debit balance of that account
+#                       at rule fire time and pay it in full. used for
+#                       credit card clearance rules.
+# ---------------------------------------------------------------------------
+
+profiles:
+  # =========================================================================
+  # SALARIED DISCIPLINED GUY
+  # Best archetype for: reconciliation baseline, ingestion correctness.
+  # Highly deterministic. Almost zero noise. Good "boring" account.
+  # =========================================================================
+  - name: salaried_disciplined
+    count: 1
+    accounts:
+      - id: salary_checking
+        type: checking
+        opening_balance: 15000
+
+      - id: high_yield_savings
+        type: savings
+        opening_balance: 200000
+
+      - id: premium_credit_card
+        type: credit
+        credit_limit: 200000
+        opening_balance: 0
+
+      - id: investments
+        type: investment
+        opening_balance: 500000
+
+    rules:
+      # Salary: small range to avoid identical rows but still deterministic
+      - type: monthly_fixed_day
+        day: 1
+        account: salary_checking
+        direction: credit
+        category: Salary
+        description: "Monthly Salary Credit"
+        amount:
+          range: { min: 85000, max: 95000 }
+
+      # Savings sweep fires immediately when salary lands
+      - type: reactive_pct
+        trigger_account: salary_checking
+        trigger_category: Salary
+        from_account: salary_checking
+        to_account: high_yield_savings
+        direction: debit
+        category: Internal Transfer
+        description: "Savings Sweep"
+        amount:
+          pct_of_source: 30
+
+      # Investment sweep fires immediately when salary lands
+      - type: reactive_pct
+        trigger_account: salary_checking
+        trigger_category: Salary
+        from_account: salary_checking
+        to_account: investments
+        direction: debit
+        category: Investment
+        description: "Investment Sweep"
+        amount:
+          pct_of_source: 20
+
+      # Rent: predictable, always first 5 days
+      - type: monthly_day_range
+        day_range: { min: 1, max: 5 }
+        account: salary_checking
+        direction: debit
+        category: Rent
+        description: "Monthly Rent"
+        amount:
+          range: { min: 18000, max: 22000 }
+
+      # Utilities: mid-month, goes on credit card
+      - type: monthly_day_range
+        day_range: { min: 10, max: 15 }
+        account: premium_credit_card
+        direction: debit
+        category: Utilities
+        description: "Utility Bill"
+        amount:
+          range: { min: 1200, max: 2500 }
+
+      # Groceries: weekly, consistent amounts
+      - type: weekly
+        weekday: saturday
+        account: premium_credit_card
+        direction: debit
+        category: Groceries
+        description: "Weekly Groceries"
+        amount:
+          range: { min: 2000, max: 3500 }
+
+      # Credit card cleared in full on 28th.
+      # settle_account means: compute outstanding balance of premium_credit_card
+      # at fire time and debit exactly that from salary_checking.
+      - type: monthly_fixed_day
+        day: 28
+        from_account: salary_checking
+        to_account: premium_credit_card
+        direction: debit
+        category: Internal Transfer
+        description: "Credit Card Full Payment"
+        amount:
+          settle_account: premium_credit_card
+
+  # =========================================================================
+  # SALARIED DOPAMINE JUNKIE
+  # Best archetype for: credit limit stress, negative balance edge cases,
+  # BNPL installment logic, decay-based frequency testing.
+  # =========================================================================
+  - name: salaried_dopamine_junkie
+    count: 1
+    accounts:
+      - id: main_checking
+        type: checking
+        opening_balance: 5000
+
+      - id: savings_zero
+        type: savings
+        opening_balance: 0 # intentionally empty — tests zero-balance accounts
+
+      - id: credit1
+        type: credit
+        credit_limit: 100000
+        opening_balance: 0
+
+      # BNPL account: every purchase on this account is automatically
+      # split into installment_count equal debits on installment_day of
+      # each following month. generator is responsible for emitting those
+      # installment transactions, not the Ledger API.
+      - id: bnpl_credit2
+        type: credit
+        credit_limit: 50000
+        opening_balance: 0
+        bnpl:
+          installment_count: 3
+          installment_day: 5
+
+      - id: credit3
+        type: credit
+        credit_limit: 80000
+        opening_balance: 0
+
+    rules:
+      - type: monthly_fixed_day
+        day: 1
+        account: main_checking
+        direction: credit
+        category: Salary
+        description: "Salary"
+        amount:
+          range: { min: 55000, max: 65000 }
+
+      # Partial payment on payday — not full clearance, models carried balance
+      - type: reactive_pct
+        trigger_account: main_checking
+        trigger_category: Salary
+        from_account: main_checking
+        to_account: credit1
+        direction: debit
+        category: Internal Transfer
+        description: "Credit Card Partial Payment"
+        amount:
+          pct_of_source: 25
+
+      - type: reactive_pct
+        trigger_account: main_checking
+        trigger_category: Salary
+        from_account: main_checking
+        to_account: credit3
+        direction: debit
+        category: Internal Transfer
+        description: "Credit Card Partial Payment"
+        amount:
+          pct_of_source: 15
+
+      # Food delivery: high first 20 days, drops sharply after.
+      # peak_frequency and trough_frequency are counts per 10-day window.
+      - type: decay_pattern
+        account: credit1
+        direction: debit
+        category: Food Delivery
+        description: "Food Delivery"
+        amount:
+          range: { min: 300, max: 900 }
+        decay:
+          peak_frequency: 8 # ~8 orders in days 1–10
+          trough_frequency: 2 # ~2 orders in days 21–31
+          inflection_day: 20
+
+      # Impulse shopping: mid-month, random
+      - type: random_n_per_month
+        day_range: { min: 5, max: 25 }
+        account: credit3
+        direction: debit
+        category: Shopping
+        description: "Online Shopping"
+        amount:
+          range: { min: 800, max: 8000 }
+        frequency:
+          mean: 4
+          variance: 2
+
+      # BNPL: occasional large purchase, installments auto-generated
+      - type: random_n_per_month
+        day_range: { min: 8, max: 20 }
+        account: bnpl_credit2
+        direction: debit
+        category: Shopping
+        description: "BNPL Purchase"
+        amount:
+          range: { min: 5000, max: 25000 }
+        frequency:
+          mean: 1
+          variance: 1
+
+  # =========================================================================
+  # FRUGAL STUDENT
+  # Best archetype for: low-volume baseline, single-account simplicity,
+  # debit-only transaction stream.
+  # =========================================================================
+  - name: frugal_student
+    count: 1
+    accounts:
+      - id: checking_debit
+        type: checking
+        opening_balance: 8000
+
+    rules:
+      - type: monthly_day_range
+        day_range: { min: 1, max: 3 }
+        account: checking_debit
+        direction: credit
+        category: Salary
+        description: "Monthly Allowance"
+        amount:
+          range: { min: 12000, max: 15000 }
+
+      - type: monthly_fixed_day
+        day: 2
+        account: checking_debit
+        direction: debit
+        category: Rent
+        description: "Room Rent"
+        amount:
+          fixed: 6000
+
+      - type: weekly
+        weekday: sunday
+        account: checking_debit
+        direction: debit
+        category: Groceries
+        description: "Weekly Grocery Run"
+        amount:
+          range: { min: 400, max: 700 }
+
+      # Transport: many small hits, spread throughout month
+      - type: random_n_per_month
+        day_range: { min: 1, max: 31 }
+        account: checking_debit
+        direction: debit
+        category: Transport
+        description: "Auto / Metro"
+        amount:
+          range: { min: 30, max: 150 }
+        frequency:
+          mean: 12
+          variance: 4
+
+      # Food delivery: infrequent, cheap
+      - type: random_n_per_month
+        day_range: { min: 1, max: 31 }
+        account: checking_debit
+        direction: debit
+        category: Food Delivery
+        description: "Food Delivery"
+        amount:
+          range: { min: 150, max: 400 }
+        frequency:
+          mean: 2
+          variance: 1
+
+  # =========================================================================
+  # CRYPTO LORD
+  # Best archetype for: high inter-account transfer volume, erratic amounts,
+  # stress testing the Go sidecar's incremental ingestion under noise.
+  # =========================================================================
+  - name: crypto_lord
+    count: 1
+    accounts:
+      - id: checking_main
+        type: checking
+        opening_balance: 50000
+
+      - id: savings_main
+        type: savings
+        opening_balance: 300000
+
+      - id: trading1
+        type: trading
+        opening_balance: 100000
+
+      - id: trading2
+        type: trading
+        opening_balance: 80000
+
+      - id: trading3
+        type: trading
+        opening_balance: 50000
+
+      - id: trading4
+        type: trading
+        opening_balance: 20000
+
+      - id: credit1
+        type: credit
+        credit_limit: 150000
+        opening_balance: 0
+
+    rules:
+      # Large erratic income: liquidations, profits — high variance
+      - type: random_n_per_month
+        day_range: { min: 1, max: 28 }
+        account: checking_main
+        direction: credit
+        category: Trading
+        description: "Crypto Liquidation"
+        amount:
+          range: { min: 50000, max: 500000 }
+        frequency:
+          mean: 2
+          variance: 2
+
+      # Large erratic outflows: deposits to exchanges
+      - type: random_n_per_month
+        day_range: { min: 1, max: 28 }
+        account: checking_main
+        direction: debit
+        category: Trading
+        description: "Crypto Deposit / Buy"
+        amount:
+          range: { min: 30000, max: 300000 }
+        frequency:
+          mean: 3
+          variance: 2
+
+      # High-frequency internal transfers — this is what makes this profile
+      # useful: lots of Internal Transfer transactions to stress reconciliation
+      - type: random_n_per_month
+        day_range: { min: 1, max: 28 }
+        from_account: checking_main
+        to_account: trading1
+        direction: debit
+        category: Internal Transfer
+        description: "Fund Trading Account"
+        amount:
+          range: { min: 10000, max: 100000 }
+        frequency:
+          mean: 5
+          variance: 3
+
+      - type: random_n_per_month
+        day_range: { min: 1, max: 28 }
+        from_account: trading1
+        to_account: trading2
+        direction: debit
+        category: Internal Transfer
+        description: "Inter-Trading Transfer"
+        amount:
+          range: { min: 5000, max: 50000 }
+        frequency:
+          mean: 6
+          variance: 3
+
+      - type: random_n_per_month
+        day_range: { min: 1, max: 28 }
+        from_account: trading2
+        to_account: savings_main
+        direction: debit
+        category: Internal Transfer
+        description: "Park Profits"
+        amount:
+          range: { min: 20000, max: 150000 }
+        frequency:
+          mean: 2
+          variance: 1
+
+      # Day-to-day expenses on credit: low relative to transfer volume
+      - type: random_n_per_month
+        day_range: { min: 1, max: 28 }
+        account: credit1
+        direction: debit
+        category: Shopping
+        description: "Misc Expense"
+        amount:
+          range: { min: 500, max: 15000 }
+        frequency:
+          mean: 6
+          variance: 3
+
+  # =========================================================================
+  # LOCAL BUSINESSMAN
+  # Best archetype for: fund segregation testing, reactive sweep chaining,
+  # Owner's Draw as a cross-account transfer pattern.
+  # =========================================================================
+  - name: local_businessman
+    count: 1
+    accounts:
+      - id: personal_checking
+        type: checking
+        opening_balance: 30000
+
+      - id: biz_checking
+        type: checking
+        opening_balance: 100000
+
+      - id: biz_credit
+        type: credit
+        credit_limit: 300000
+        opening_balance: 0
+
+      - id: tax_saver_savings
+        type: savings
+        opening_balance: 50000
+
+    rules:
+      # Revenue: 2–4 client payments per month, irregular timing and amount
+      - type: random_n_per_month
+        day_range: { min: 1, max: 28 }
+        account: biz_checking
+        direction: credit
+        category: Business Revenue
+        description: "Client Payment"
+        amount:
+          range: { min: 40000, max: 150000 }
+        frequency:
+          mean: 3
+          variance: 1
+
+      # Tax sweep fires on every incoming Business Revenue credit automatically.
+      # This tests reactive_pct chaining: revenue lands → sweep fires immediately.
+      - type: reactive_pct
+        trigger_account: biz_checking
+        trigger_category: Business Revenue
+        from_account: biz_checking
+        to_account: tax_saver_savings
+        direction: debit
+        category: Tax Reserve
+        description: "Tax Reserve Sweep"
+        amount:
+          pct_of_source: 25
+
+      # Business expenses: vendor payments, supplies, misc
+      - type: random_n_per_month
+        day_range: { min: 1, max: 28 }
+        account: biz_credit
+        direction: debit
+        category: Business Expense
+        description: "Business Expense"
+        amount:
+          range: { min: 2000, max: 40000 }
+        frequency:
+          mean: 8
+          variance: 3
+
+      # Owner's Draw: the key cross-account pattern for this profile.
+      # Transfers personal salary from business checking to personal checking.
+      # frequency mean:1 means roughly once a month, sometimes zero.
+      - type: random_n_per_month
+        day_range: { min: 1, max: 28 }
+        from_account: biz_checking
+        to_account: personal_checking
+        direction: debit
+        category: Internal Transfer
+        description: "Owner's Draw"
+        amount:
+          range: { min: 20000, max: 60000 }
+        frequency:
+          mean: 1
+          variance: 1
+
+      # Capital Injection: owner bails out the business occasionally.
+      # probability: 0.4 means 40% chance this event fires at all in the
+      # full date range. Models a rare but realistic scenario.
+      - type: one_time_in_range
+        probability: 0.4
+        day_range: { min: 30, max: 200 } # offset days from date_range.start
+        from_account: personal_checking
+        to_account: biz_checking
+        direction: debit
+        category: Internal Transfer
+        description: "Capital Injection"
+        amount:
+          range: { min: 50000, max: 200000 }
+
+      # Personal groceries from personal checking — kept separate from biz
+      - type: random_n_per_month
+        day_range: { min: 1, max: 28 }
+        account: personal_checking
+        direction: debit
+        category: Groceries
+        description: "Personal Groceries"
+        amount:
+          range: { min: 1500, max: 3000 }
+        frequency:
+          mean: 4
+          variance: 1
+
+  # =========================================================================
+  # AFK BRO
+  # Best archetype for: subscription clustering, near-zero mid-month activity,
+  # clean timeline with very high day-1 transaction density.
+  # =========================================================================
+  - name: afk_bro
+    count: 1
+    accounts:
+      - id: checking1
+        type: checking
+        opening_balance: 20000
+
+      - id: credit1
+        type: credit
+        credit_limit: 50000
+        opening_balance: 0
+
+    rules:
+      - type: monthly_fixed_day
+        day: 1
+        account: checking1
+        direction: credit
+        category: Salary
+        description: "Monthly Salary"
+        amount:
+          range: { min: 50000, max: 60000 }
+
+      # All subscriptions on day 1 — creates extreme density on that date.
+      # Each is its own rule with a fixed amount. Add or remove subs here.
+      - type: monthly_fixed_day
+        day: 1
+        account: credit1
+        direction: debit
+        category: Subscriptions
+        description: "Netflix"
+        amount:
+          fixed: 649
+
+      - type: monthly_fixed_day
+        day: 1
+        account: credit1
+        direction: debit
+        category: Subscriptions
+        description: "Spotify"
+        amount:
+          fixed: 119
+
+      - type: monthly_fixed_day
+        day: 1
+        account: credit1
+        direction: debit
+        category: Subscriptions
+        description: "Amazon Prime"
+        amount:
+          fixed: 299
+
+      - type: monthly_fixed_day
+        day: 1
+        account: credit1
+        direction: debit
+        category: Subscriptions
+        description: "YouTube Premium"
+        amount:
+          fixed: 189
+
+      - type: monthly_fixed_day
+        day: 1
+        account: credit1
+        direction: debit
+        category: Subscriptions
+        description: "iCloud Storage"
+        amount:
+          fixed: 130
+
+      # Rent on day 2 — one day after salary, deliberate
+      - type: monthly_fixed_day
+        day: 2
+        account: checking1
+        direction: debit
+        category: Rent
+        description: "Monthly Rent"
+        amount:
+          fixed: 15000
+
+      # Credit card cleared on day 3 — after all subs have posted.
+      # settle_account computes outstanding balance at fire time.
+      - type: monthly_fixed_day
+        day: 3
+        from_account: checking1
+        to_account: credit1
+        direction: debit
+        category: Internal Transfer
+        description: "Credit Card Full Payment"
+        amount:
+          settle_account: credit1
+
+      # The only mid-month activity: occasional food order
+      - type: random_n_per_month
+        day_range: { min: 5, max: 28 }
+        account: credit1
+        direction: debit
+        category: Food Delivery
+        description: "Food Delivery"
+        amount:
+          range: { min: 200, max: 600 }
+        frequency:
+          mean: 2
+          variance: 1
+
+  # =========================================================================
+  # DEAL HUNTER
+  # Best archetype for: refund logic, credit holds, low-frequency
+  # high-amount transaction patterns. Good for AI anomaly detection testing.
+  # =========================================================================
+  - name: deal_hunter
+    count: 1
+    accounts:
+      - id: checking1
+        type: checking
+        opening_balance: 80000 # hoards cash — high balance, low activity
+
+      - id: credit1
+        type: credit
+        credit_limit: 200000
+        opening_balance: 0
+
+    rules:
+      - type: monthly_fixed_day
+        day: 1
+        account: checking1
+        direction: credit
+        category: Salary
+        description: "Monthly Salary"
+        amount:
+          range: { min: 70000, max: 80000 }
+
+      # Infrequent but large purchases — the defining pattern
+      - type: random_n_per_month
+        day_range: { min: 1, max: 28 }
+        account: credit1
+        direction: debit
+        category: Shopping
+        description: "Big Purchase"
+        amount:
+          range: { min: 5000, max: 80000 }
+        frequency:
+          mean: 2
+          variance: 1
+
+      # refund_shadow attaches to the rule above.
+      # For each Shopping transaction on credit1, a refund credit fires with
+      # refund_probability. The refund amount equals the original transaction.
+      # description supports {source_description} template substitution.
+      - type: refund_shadow
+        source_category: Shopping
+        source_account: credit1
+        refund_probability: 0.35
+        refund_delay_days:
+          range: { min: 3, max: 14 }
+        category: Refund
+        description: "Refund - {source_description}"
+
+      # Minimal regular spending — groceries only, infrequent
+      - type: random_n_per_month
+        day_range: { min: 1, max: 28 }
+        account: checking1
+        direction: debit
+        category: Groceries
+        description: "Groceries"
+        amount:
+          range: { min: 800, max: 1500 }
+        frequency:
+          mean: 2
+          variance: 1
+
+  # =========================================================================
+  # FREELANCE
+  # Best archetype for: variable income cadence, reactive sweep chaining
+  # on irregular credits, high frequency/variance income stream.
+  # =========================================================================
+  - name: freelance
+    count: 1
+    accounts:
+      - id: income_checking
+        type: checking
+        opening_balance: 15000
+
+      - id: tax_reserve
+        type: savings
+        opening_balance: 30000
+
+      - id: credit1
+        type: credit
+        credit_limit: 80000
+        opening_balance: 0
+
+    rules:
+      # Income: small, unpredictable, multiple times per month.
+      # High variance is intentional — tests ingestion under irregular inflow.
+      - type: random_n_per_month
+        day_range: { min: 1, max: 28 }
+        account: income_checking
+        direction: credit
+        category: Salary
+        description: "Freelance Payment"
+        amount:
+          range: { min: 8000, max: 35000 }
+        frequency:
+          mean: 4
+          variance: 3 # sometimes 1 payment, sometimes 7
+
+      # Tax sweep: fires on every income credit, not just once a month.
+      # This tests that reactive_pct fires multiple times per month correctly.
+      - type: reactive_pct
+        trigger_account: income_checking
+        trigger_category: Salary
+        from_account: income_checking
+        to_account: tax_reserve
+        direction: debit
+        category: Tax Reserve
+        description: "Tax Reserve Sweep"
+        amount:
+          pct_of_source: 30
+
+      - type: monthly_fixed_day
+        day: 5
+        account: income_checking
+        direction: debit
+        category: Rent
+        description: "Rent"
+        amount:
+          range: { min: 12000, max: 14000 }
+
+      - type: weekly
+        weekday: friday
+        account: credit1
+        direction: debit
+        category: Groceries
+        description: "Groceries"
+        amount:
+          range: { min: 800, max: 1500 }
+
+      - type: random_n_per_month
+        day_range: { min: 1, max: 28 }
+        account: credit1
+        direction: debit
+        category: Food Delivery
+        description: "Food Delivery"
+        amount:
+          range: { min: 200, max: 700 }
+        frequency:
+          mean: 5
+          variance: 2
+
+  # =========================================================================
+  # FAMILY CFO
+  # Best archetype for: multi-account fan-out, parallel savings bucket splits,
+  # high overall transaction volume, two credit card streams.
+  # =========================================================================
+  - name: family_cfo
+    count: 1
+    accounts:
+      - id: joint_checking
+        type: checking
+        opening_balance: 25000
+
+      - id: personal_checking
+        type: checking
+        opening_balance: 10000
+
+      - id: savings_emergency
+        type: savings
+        opening_balance: 150000
+
+      - id: savings_vacation
+        type: savings
+        opening_balance: 30000
+
+      - id: savings_education
+        type: savings
+        opening_balance: 80000
+
+      - id: credit1
+        type: credit
+        credit_limit: 200000
+        opening_balance: 0
+
+      - id: credit2
+        type: credit
+        credit_limit: 150000
+        opening_balance: 0
+
+    rules:
+      # Joint salary: high amount, single source, lands in joint checking
+      - type: monthly_fixed_day
+        day: 1
+        account: joint_checking
+        direction: credit
+        category: Salary
+        description: "Joint Salary"
+        amount:
+          range: { min: 120000, max: 140000 }
+
+      # Immediate three-way split on payday — all reactive_pct on same trigger.
+      # Generator must fire all three on the same day as the salary credit.
+      - type: reactive_pct
+        trigger_account: joint_checking
+        trigger_category: Salary
+        from_account: joint_checking
+        to_account: savings_emergency
+        direction: debit
+        category: Internal Transfer
+        description: "Emergency Fund Sweep"
+        amount:
+          pct_of_source: 10
+
+      - type: reactive_pct
+        trigger_account: joint_checking
+        trigger_category: Salary
+        from_account: joint_checking
+        to_account: savings_vacation
+        direction: debit
+        category: Internal Transfer
+        description: "Vacation Fund Sweep"
+        amount:
+          pct_of_source: 8
+
+      - type: reactive_pct
+        trigger_account: joint_checking
+        trigger_category: Salary
+        from_account: joint_checking
+        to_account: savings_education
+        direction: debit
+        category: Internal Transfer
+        description: "Education Fund Sweep"
+        amount:
+          pct_of_source: 12
+
+      # Personal allowance: a 4th reactive split
+      - type: reactive_pct
+        trigger_account: joint_checking
+        trigger_category: Salary
+        from_account: joint_checking
+        to_account: personal_checking
+        direction: debit
+        category: Internal Transfer
+        description: "Personal Allowance"
+        amount:
+          pct_of_source: 8
+
+      # Rent: first 3 days, from joint checking
+      - type: monthly_day_range
+        day_range: { min: 1, max: 3 }
+        account: joint_checking
+        direction: debit
+        category: Rent
+        description: "House Rent"
+        amount:
+          range: { min: 28000, max: 32000 }
+
+      # Groceries: weekly, credit1
+      - type: weekly
+        weekday: saturday
+        account: credit1
+        direction: debit
+        category: Groceries
+        description: "Weekly Groceries"
+        amount:
+          range: { min: 3000, max: 5000 }
+
+      # Daily life expenses: transport, school, commute — high frequency
+      - type: random_n_per_month
+        day_range: { min: 1, max: 28 }
+        account: credit2
+        direction: debit
+        category: Transport
+        description: "School Transport / Commute"
+        amount:
+          range: { min: 200, max: 800 }
+        frequency:
+          mean: 20
+          variance: 4
+
+      # Medical: monthly cluster, low count
+      - type: random_n_per_month
+        day_range: { min: 1, max: 28 }
+        account: credit2
+        direction: debit
+        category: Healthcare
+        description: "Medical / Pharmacy"
+        amount:
+          range: { min: 500, max: 5000 }
+        frequency:
+          mean: 3
+          variance: 2
+
+      # Both credit cards cleared on 28th
+      - type: monthly_fixed_day
+        day: 28
+        from_account: joint_checking
+        to_account: credit1
+        direction: debit
+        category: Internal Transfer
+        description: "Credit Card 1 Full Payment"
+        amount:
+          settle_account: credit1
+
+      - type: monthly_fixed_day
+        day: 28
+        from_account: joint_checking
+        to_account: credit2
+        direction: debit
+        category: Internal Transfer
+        description: "Credit Card 2 Full Payment"
+        amount:
+          settle_account: credit2
+
+      # Personal discretionary: dining, entertainment from personal checking
+      - type: random_n_per_month
+        day_range: { min: 1, max: 28 }
+        account: personal_checking
+        direction: debit
+        category: Entertainment
+        description: "Dining / Entertainment"
+        amount:
+          range: { min: 500, max: 3000 }
+        frequency:
+          mean: 6
+          variance: 2

@@ -15,6 +15,7 @@ TODO.md
 # Python / AI
 **/__pycache__/
 **/.venv/
+**/venv/
 
 # Env
 .env
