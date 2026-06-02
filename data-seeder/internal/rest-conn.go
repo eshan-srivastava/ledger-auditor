@@ -5,11 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 )
 
+var BASE_API = getBaseAPI()
+
+func getBaseAPI() string {
+	if url := os.Getenv("LEDGER_API_URL"); url != "" {
+		return url
+	}
+	return "http://localhost/api"
+}
+
 const (
-	BASE_API     = "http://localhost/api"
 	BaseUsers    = "/users"
 	BaseTxn      = "/transactions"
 	BaseAccounts = "/accounts"
