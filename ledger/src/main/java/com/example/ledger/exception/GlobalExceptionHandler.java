@@ -55,13 +55,13 @@ public class GlobalExceptionHandler {
     // fallback
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnhandled(
-        AppException ex,
+        Exception ex,
         HttpServletRequest request) {
 
         return ResponseEntity
             .status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(ApiError.of(ErrorCode.INTERNAL_ERROR, "Unexpected ErrorCode", request.getRequestURI()));
-    };
+            .body(ApiError.of(ErrorCode.INTERNAL_ERROR, "Unexpected internal error", request.getRequestURI()));
+    }
 
     private @NonNull HttpStatus mapStatus(ErrorCode code) {
         return switch (code) {
