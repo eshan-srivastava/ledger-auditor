@@ -13,7 +13,7 @@ class LLMServiceException(Exception):
         self.message = message
         self.status_code = status_code
         super().__init__(self.message)
-        
+
 class ModelNotFoundException(LLMServiceException):
     def __init__(self, model: str):
         message = f"Model named {model} not found"

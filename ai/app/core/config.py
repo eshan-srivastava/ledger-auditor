@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
+from pydantic import Field, SecretStr
 
 class AppSettings(BaseSettings):
     """
@@ -28,7 +28,7 @@ class AppSettings(BaseSettings):
     #LLM Config
     llm_provider: str = Field("gemini")
     llm_model: str = Field("gemini-3.5-flash")
-    llm_api_key: str = Field("")
+    llm_api_key: SecretStr = SecretStr("")
     max_tokens = Field(5000)
     
     #DB Config
