@@ -3,18 +3,21 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"log"
 
 	"github.com/eshan-srivastava/ingestor-go/internal/models"
+	"github.com/jmoiron/sqlx"
 	_ "modernc.org/sqlite"
 )
 
 type SqLDB struct {
-	db *sql.DB
+	db *sqlx.DB
 }
 
-func GetDB(dbURI string) (*SqLDB, error) {
-	db, err := sql.Open("sqlite", dbURI)
+func NewDB(dbURI string) (*SqLDB, error) {
+	db, err := sqlx.Connect("sqlite", dbURI)
 
 	if err != nil {
 		return nil, err
@@ -52,10 +55,37 @@ func (d *SqLDB) Close() {
 	}
 }
 
-func (d *SqLDB) addTransaction() error {
+func (d *SqLDB) InsertTransaction(ctx context.Context, rt models.ReadTransaction) error {
+	result, err := d.db.NamedExecContext(ctx, create_txn, &rt)
+	if err != nil {
+		return fmt.Errorf("error inserting transaction: %w", err)
+	}
 
+	affected, err := result.RowsAffected()
+	if err != nil || affected == 0 {
+		return fmt.Errorf("no rows affected (err): %w", err)
+	}
+
+	return nil
 }
 
-func (d *SqLDB) fetchTransactionByFilters() ([]models.ReadTransaction, error) {
+func (d *SqLDB) FetchTransactionByFilters(ctx context.Context, filters map[string]any) (*models.PagedTxnListResponse, error) {
 
+	return nil, nil
 }
+
+func (d *SqLDB) FetchTransactionById(ctx context.Context, txnID float64) (*models.TxnResponse, error) {
+	var rt models.ReadTransaction
+	err := d.db.GetContext(ctx, &rt, select_1_txn, txnID)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, models.ErrTxnNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("error getting transaction: %w", err)
+	}
+
+	return &rt, nil
+}
+
+func (d *SqLDB) FetchTransactionList(ctx context.Context, txnID []float64) ([]models.TxnResponse, error)

@@ -8,13 +8,13 @@ import (
 )
 
 type ReadTransaction struct {
-	TransactionID int64     `json:"id"`
-	Amount        float64   `json:"amount"`
-	CreatedAt     time.Time `json:"createdAt"`
-	SourceAccID   int64     `json:"sourceAccId"`
-	DestAccID     int64     `json:"destAccId"`
-	NoteString    string    `json:"noteString"`
-	Checksum      string
+	TransactionID int64     `json:"id" db:"id"`
+	Amount        float64   `json:"amount" db:"amount"`
+	CreatedAt     time.Time `json:"createdAt" db:"createdAt"`
+	SourceAccID   int64     `json:"sourceAccId" db:"sourceAccId"`
+	DestAccID     int64     `json:"destAccId" db:"destAccId"`
+	NoteString    string    `json:"noteString" db:"noteString"`
+	Checksum      string    `db:"checksum"`
 }
 
 func (rt *ReadTransaction) ValidateChecksum() error {
