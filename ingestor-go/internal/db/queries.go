@@ -17,6 +17,6 @@ const (
 	select_n_txn = `
 	SELECT id,amount,createdAt,sourceAccId,destAccId,noteString,checksum
 	FROM transactions WHERE
-	id IN ?
+	id IN (?)
 	`
 )

@@ -21,7 +21,7 @@ type AccountBalanceResponse struct {
 	Balance       float64 `json:"balance"`
 }
 
-type TransactionByIDResponse struct {
+type ExtTransactionByIDResp struct {
 	TxnID     int64     `json:"id"`
 	Amount    float64   `json:"amount"`
 	Timestamp time.Time `json:"timestamp"`
@@ -30,11 +30,11 @@ type TransactionByIDResponse struct {
 	DestinationAccNum string `json:"destinationAccountNum"`
 }
 
-type TransactionListRespElem = TransactionByIDResponse
+type ExtTransactionListRespElem = ExtTransactionByIDResp
 
-type TransactionListResponse struct {
-	Content     []TransactionListRespElem `json:"content"`
-	PageDetails PageableDetails           `json:"pageable"`
+type ExtTransactionListResp struct {
+	Content     []ExtTransactionListRespElem `json:"content"`
+	PageDetails PageableDetails              `json:"pageable"`
 
 	// Top Level Pageable
 	Total      int  `json:"total"`

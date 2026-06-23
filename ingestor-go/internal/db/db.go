@@ -31,8 +31,9 @@ func (d *SqLDB) EnsureTableAndIndex() error {
 
 	_, err := d.db.ExecContext(
 		context.Background(),
+		// avoiding autoincrement because its needless computation
 		`CREATE TABLE IF NOT EXISTS transactions(
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			id INTEGER PRIMARY KEY,
 			amount REAL NOT NULL,
 			created_at REAL NOT NULL,
 			source_acc_id INTEGER NOT NULL,
@@ -43,6 +44,13 @@ func (d *SqLDB) EnsureTableAndIndex() error {
 		CREATE INDEX idx_created_at ON transactions(created_at);
 		CREATE INDEX idx_source_acc ON transactions(source_acc_id);
 		CREATE INDEX idx_dest_acc ON transactions(dest_acc_ind);	
+		
+		CREATE TABLE sync_state (
+			id INTEGER PRIMARY KEY CHECK (id = 1),
+			last_seen_created_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00ZZ',
+			last_seen_id INTEGER NOT NULL DEFAULT 0,
+			updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);
 		`,
 	)
 	return err
@@ -69,12 +77,7 @@ func (d *SqLDB) InsertTransaction(ctx context.Context, rt models.ReadTransaction
 	return nil
 }
 
-func (d *SqLDB) FetchTransactionByFilters(ctx context.Context, filters map[string]any) (*models.PagedTxnListResponse, error) {
-
-	return nil, nil
-}
-
-func (d *SqLDB) FetchTransactionById(ctx context.Context, txnID float64) (*models.TxnResponse, error) {
+func (d *SqLDB) FetchTransactionById(ctx context.Context, txnID int64) (*models.TxnResponse, error) {
 	var rt models.ReadTransaction
 	err := d.db.GetContext(ctx, &rt, select_1_txn, txnID)
 
@@ -88,4 +91,28 @@ func (d *SqLDB) FetchTransactionById(ctx context.Context, txnID float64) (*model
 	return &rt, nil
 }
 
-func (d *SqLDB) FetchTransactionList(ctx context.Context, txnID []float64) ([]models.TxnResponse, error)
+func (d *SqLDB) FetchTransactionByFilters(ctx context.Context, filters map[string]any) (*models.PagedTxnListResponse, error) {
+
+	return nil, nil
+}
+
+func (d *SqLDB) FetchTransactionList(ctx context.Context, txnIDs []int64) ([]models.TxnResponse, error) {
+	if len(txnIDs) == 0 {
+		return nil, fmt.Errorf("id list empty")
+	}
+
+	query, args, err := sqlx.In(select_n_txn, txnIDs)
+	if err != nil {
+		return nil, fmt.Errorf("database error: %w", err)
+	}
+
+	query = d.db.Rebind(query)
+
+	var rts []models.ReadTransaction
+	err = d.db.SelectContext(ctx, &rts, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching db transaction list: %w", err)
+	}
+
+	return rts, nil
+}
