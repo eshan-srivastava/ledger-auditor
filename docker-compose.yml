@@ -3,6 +3,8 @@ name: ledger-system
 services:
   postgres:
     image: postgres:16
+    # image: pgvector/pgvector:pg16
+    profiles: ["deps", "full"]
     environment:
       POSTGRES_DB: ledgerdb
       POSTGRES_USER: ledgeruser
@@ -11,6 +13,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # - ./pg-init:/docker-entrypoint.initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ledgeruser -d ledgerdb"]
       interval: 1m30s
@@ -22,6 +25,7 @@ services:
     build:
       context: ./ledger
       dockerfile: Dockerfile
+    profiles: ["full"]
     container_name: ledgerapp
     depends_on:
       postgres:
@@ -49,6 +53,9 @@ services:
     build:
       context: ./data-seeder
       dockerfile: Dockerfile
+    # volumes:
+    # - sidecar-data:/data
+    profiles: ["full"]
     depends_on:
       postgres:
         condition: service_started
@@ -58,7 +65,9 @@ services:
       RUN_SEEDER: false
       PG_URL: postgres://ledgeruser:ledgerpass@postgres:5432/ledgerdb?sslmode=disable
       LEDGER_API_URL: http://ledger:8080/api
+      # SQLITE_PATH: /data/mirror.db
     restart: "no"
 
 volumes:
   postgres_data:
+  sidecar-data:
