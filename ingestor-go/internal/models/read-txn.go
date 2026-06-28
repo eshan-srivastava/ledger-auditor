@@ -39,3 +39,10 @@ func (rt *ReadTransaction) ComputeChecksum() {
 	newChecksum := hex.EncodeToString(rawhash[:])
 	rt.Checksum = newChecksum
 }
+
+type PollerCursor struct {
+	ID                int64     `json:"id" db:"id"`
+	LastSeenCreatedAt time.Time `json:"last_seen_created_at" db:"last_seen_created_at"`
+	LastSeenID        string    `json:"last_seen_id" db:"last_seen_id"`
+	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
+}

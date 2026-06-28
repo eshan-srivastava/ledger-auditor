@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/eshan-srivastava/ingestor-go/internal/lib"
 	"github.com/eshan-srivastava/ingestor-go/internal/models"
@@ -16,10 +17,17 @@ var (
 	GETTxnListRoute = "transactions/"
 )
 
-func GetUpstreamTransactions(ctx context.Context, hc *lib.HTTPClient) (*models.ExtTransactionListResp, error) {
-	finalUrl := fmt.Sprintf("%s/%s", BASE_URL, GETTxnListRoute)
-
+func GetUpstreamTransactions(
+	ctx context.Context,
+	lastSeenTimestamp time.Time,
+	lastId string,
+	limit int,
+	hc *lib.HTTPClient,
+) (*models.ExtTransactionListResp, error) {
 	// construct query params
+	queryUrl := fmt.Sprintf("fromDate=%s&afterId=%s&size=%d", lastSeenTimestamp.Format(time.DateOnly), lastId, limit)
+
+	finalUrl := fmt.Sprintf("%s/%s?%s", BASE_URL, GETTxnListRoute, queryUrl)
 
 	if hc == nil {
 		return nil, fmt.Errorf("httpClient nil")

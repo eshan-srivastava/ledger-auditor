@@ -15,5 +15,7 @@ type TransactionRepository interface {
 }
 
 // Accessing transaction data from origin
+// Currently we have 2 potential implementations:
+// poller vs stream
 type DataOrigin interface {
 }
